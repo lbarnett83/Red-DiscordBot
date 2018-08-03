@@ -294,7 +294,7 @@ class Economy:
         if "PAYDAY_TIME" in self.settings:  # old format
             default_settings = self.settings
             self.settings = {}
-        self.settings = defaultdict(lambda: default_settings, self.settings)
+        self.settings = defaultdict(default_settings.copy, self.settings)
         self.payday_register = defaultdict(dict)
         self.slot_register = defaultdict(dict)
 
@@ -398,6 +398,19 @@ class Economy:
         except NoAccount:
             await self.bot.say("User has no bank account.")
 
+    @_bank.command(pass_context=True, no_pm=True)
+    @checks.serverowner_or_permissions(administrator=True)
+    async def reset(self, ctx, confirmation: bool=False):
+        """Deletes all server's bank accounts"""
+        if confirmation is False:
+            await self.bot.say("This will delete all bank accounts on "
+                               "this server.\nIf you're sure, type "
+                               "{}bank reset yes".format(ctx.prefix))
+        else:
+            self.bank.wipe_bank(ctx.message.server)
+            await self.bot.say("All bank accounts of this server have been "
+                               "deleted.")
+
     @commands.command(pass_context=True, no_pm=True)
     async def payday(self, ctx):  # TODO
         """Get some free credits"""
@@ -441,11 +454,14 @@ class Economy:
     async def leaderboard(self, ctx):
         """Server / global leaderboard
 
-        Defaults to server"""
+        Defaults to \"server\" if not issued in DM"""
         if ctx.invoked_subcommand is None:
-            await ctx.invoke(self._server_leaderboard)
+            if ctx.message.server:
+                await ctx.invoke(self._server_leaderboard)
+            else:
+                await ctx.invoke(self._global_leaderboard)
 
-    @leaderboard.command(name="server", pass_context=True)
+    @leaderboard.command(name="server", pass_context=True, no_pm=True)
     async def _server_leaderboard(self, ctx, top: int=10):
         """Prints out the server's leaderboard
 
@@ -456,6 +472,7 @@ class Economy:
             top = 10
         bank_sorted = sorted(self.bank.get_server_accounts(server),
                              key=lambda x: x.balance, reverse=True)
+        bank_sorted = [a for a in bank_sorted if a.member] #  exclude users who left
         if len(bank_sorted) < top:
             top = len(bank_sorted)
         topten = bank_sorted[:top]
@@ -463,7 +480,7 @@ class Economy:
         place = 1
         for acc in topten:
             highscore += str(place).ljust(len(str(top)) + 1)
-            highscore += (acc.name + " ").ljust(23 - len(str(acc.balance)))
+            highscore += (str(acc.member.display_name) + " ").ljust(23 - len(str(acc.balance)))
             highscore += str(acc.balance) + "\n"
             place += 1
         if highscore != "":
@@ -481,6 +498,7 @@ class Economy:
             top = 10
         bank_sorted = sorted(self.bank.get_all_accounts(),
                              key=lambda x: x.balance, reverse=True)
+        bank_sorted = [a for a in bank_sorted if a.member] #  exclude users who left
         unique_accounts = []
         for acc in bank_sorted:
             if not self.already_in_list(unique_accounts, acc):
@@ -492,7 +510,7 @@ class Economy:
         place = 1
         for acc in topten:
             highscore += str(place).ljust(len(str(top)) + 1)
-            highscore += ("{} |{}| ".format(acc.name, acc.server.name)
+            highscore += ("{} |{}| ".format(acc.member, acc.server)
                           ).ljust(23 - len(str(acc.balance)))
             highscore += str(acc.balance) + "\n"
             place += 1
@@ -576,7 +594,7 @@ class Economy:
             # Still nothing. Let's check for 3 generic same symbols
             # or 2 consecutive symbols
             has_three = rows[1][0] == rows[1][1] == rows[1][2]
-            has_two = (rows[1][0] == rows[1][1]) or (rows[1][1] == rows[1][0])
+            has_two = (rows[1][0] == rows[1][1]) or (rows[1][1] == rows[1][2])
             if has_three:
                 payout = PAYOUTS["3 symbols"]
             elif has_two:

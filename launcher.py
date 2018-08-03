@@ -92,7 +92,7 @@ def install_reqs(audio):
     if code == 0:
         print("\nRequirements setup completed.")
     else:
-        print("\nAn error occured and the requirements setup might "
+        print("\nAn error occurred and the requirements setup might "
               "not be completed. Consult the docs.\n")
 
 
@@ -140,7 +140,7 @@ def reset_red(reqs=False, data=False, cogs=False, git_reset=False):
         except FileNotFoundError:
             pass
         except Exception as e:
-            print("An error occured when trying to remove installed "
+            print("An error occurred when trying to remove installed "
                   "requirements: {}".format(e))
     if data:
         try:
@@ -149,7 +149,7 @@ def reset_red(reqs=False, data=False, cogs=False, git_reset=False):
         except FileNotFoundError:
             pass
         except Exception as e:
-            print("An error occured when trying to remove the 'data' folder: "
+            print("An error occurred when trying to remove the 'data' folder: "
                   "{}".format(e))
 
     if cogs:
@@ -159,7 +159,7 @@ def reset_red(reqs=False, data=False, cogs=False, git_reset=False):
         except FileNotFoundError:
             pass
         except Exception as e:
-            print("An error occured when trying to remove the 'cogs' folder: "
+            print("An error occurred when trying to remove the 'cogs' folder: "
                   "{}".format(e))
 
     if git_reset:
@@ -245,7 +245,7 @@ def requirements_menu():
         print("1. Install basic + audio requirements (recommended)")
         print("2. Install basic requirements")
         if IS_WINDOWS:
-            print("\nffmpeg (audio requirement):")
+            print("\nffmpeg (required for audio):")
             print("3. Install ffmpeg 32bit")
             if IS_64BIT:
                 print("4. Install ffmpeg 64bit (recommended on Windows 64bit)")
@@ -418,7 +418,7 @@ def user_pick_yes_no():
 
 
 def remove_readonly(func, path, excinfo):
-    os.chmod(path, stat.S_IWRITE)
+    os.chmod(path, 0o755)
     func(path)
 
 
@@ -426,12 +426,12 @@ def remove_reqs_readonly():
     """Workaround for issue #569"""
     if not os.path.isdir(REQS_DIR):
         return
-    os.chmod(REQS_DIR, stat.S_IWRITE)
+    os.chmod(REQS_DIR, 0o755)
     for root, dirs, files in os.walk(REQS_DIR):
         for d in dirs:
-            os.chmod(os.path.join(root, d), stat.S_IWRITE)
+            os.chmod(os.path.join(root, d), 0o755)
         for f in files:
-            os.chmod(os.path.join(root, f), stat.S_IWRITE)
+            os.chmod(os.path.join(root, f), 0o755)
 
 
 def calculate_md5(filename):
@@ -455,17 +455,19 @@ def create_fast_start_scripts():
     modified = False
 
     if IS_WINDOWS:
+        ccd = "pushd %~dp0\n"
         pause = "\npause"
         ext = ".bat"
     else:
-        pause = "\nread -rsp $'Press enter to continue...\n'"
+        ccd = 'cd "$(dirname "$0")"\n'
+        pause = "\nread -rsp $'Press enter to continue...\\n'"
         if not IS_MAC:
             ext = ".sh"
         else:
             ext = ".command"
 
-    start_red             = start_red + pause
-    start_red_autorestart = start_red_autorestart + pause
+    start_red             = ccd + start_red             + pause
+    start_red_autorestart = ccd + start_red_autorestart + pause
 
     files = {
         "start_red"             + ext : start_red,
@@ -473,7 +475,7 @@ def create_fast_start_scripts():
     }
 
     if not IS_WINDOWS:
-        files["start_launcher" + ext] = call
+        files["start_launcher" + ext] = ccd + call
 
     for filename, content in files.items():
         if not os.path.isfile(filename):
@@ -505,7 +507,7 @@ def main():
         print(INTRO)
 
         if not is_git_installation:
-            print("WARNING: It doesnt' look like Red has been "
+            print("WARNING: It doesn't look like Red has been "
                   "installed with git.\nThis means that you won't "
                   "be able to update and some features won't be working.\n"
                   "A reinstallation is recommended. Follow the guide "
